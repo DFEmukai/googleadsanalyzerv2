@@ -1,0 +1,155 @@
+# ============================================================
+# Google Ads AI Agent — Cloud Build CI/CD
+# Builds and deploys backend + frontend to Cloud Run
+# ============================================================
+#
+# Usage:
+#   gcloud builds submit \
+#     --config cloudbuild.yaml \
+#     --substitutions=_REGION=asia-northeast1,_BACKEND_URL=https://googleads-backend-xxxxx-an.a.run.app
+#
+
+substitutions:
+  _REGION: asia-northeast1
+  _BACKEND_SERVICE: googleads-backend
+  _FRONTEND_SERVICE: googleads-frontend
+  _BACKEND_URL: ""
+  _VPC_CONNECTOR: ""
+
+steps:
+  # ============================================================
+  # 1. Build Backend Docker image
+  # ============================================================
+  - id: "build-backend"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:latest"
+      - "./backend"
+
+  # ============================================================
+  # 2. Build Frontend Docker image
+  # ============================================================
+  - id: "build-frontend"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:latest"
+      - "--build-arg"
+      - "NEXT_PUBLIC_API_URL=${_BACKEND_URL}"
+      - "./frontend"
+
+  # ============================================================
+  # 3. Push Backend image
+  # ============================================================
+  - id: "push-backend"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA"
+    waitFor: ["build-backend"]
+
+  - id: "push-backend-latest"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:latest"
+    waitFor: ["build-backend"]
+
+  # ============================================================
+  # 4. Push Frontend image
+  # ============================================================
+  - id: "push-frontend"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA"
+    waitFor: ["build-frontend"]
+
+  - id: "push-frontend-latest"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:latest"
+    waitFor: ["build-frontend"]
+
+  # ============================================================
+  # 5. Deploy Backend to Cloud Run
+  # ============================================================
+  - id: "deploy-backend"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_BACKEND_SERVICE}"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--port"
+      - "8000"
+      - "--memory"
+      - "512Mi"
+      - "--cpu"
+      - "1"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "2"
+      - "--timeout"
+      - "300"
+      - "--set-env-vars"
+      - "PYTHONUNBUFFERED=1"
+      - "--vpc-connector"
+      - "${_VPC_CONNECTOR}"
+      - "--allow-unauthenticated"
+    waitFor: ["push-backend", "push-backend-latest"]
+
+  # ============================================================
+  # 6. Deploy Frontend to Cloud Run
+  # ============================================================
+  - id: "deploy-frontend"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_FRONTEND_SERVICE}"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--port"
+      - "3000"
+      - "--memory"
+      - "256Mi"
+      - "--cpu"
+      - "1"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "2"
+      - "--allow-unauthenticated"
+    waitFor: ["push-frontend", "push-frontend-latest"]
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/${_BACKEND_SERVICE}:latest"
+  - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}:latest"
+
+timeout: "1200s"
