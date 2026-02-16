@@ -17,10 +17,10 @@ RUN apt-get update && \
 RUN python -m venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Install Python dependencies
-COPY pyproject.toml ./
+# Install Python dependencies via requirements.txt
+COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir -r requirements.txt
 
 # ------ Stage 2: Runtime ------
 FROM python:3.13-slim
