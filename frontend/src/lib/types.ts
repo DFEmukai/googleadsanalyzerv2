@@ -92,6 +92,8 @@ export interface Proposal {
   target_ad_group: string | null;
   status: string;
   created_at: string;
+  campaign_status: string | null;  // "active", "paused", "ended", "not_found"
+  is_campaign_active: boolean;
 }
 
 export interface AnalysisResult {

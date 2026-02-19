@@ -17,6 +17,9 @@ class ProposalResponse(BaseModel):
     target_ad_group: Optional[str] = None
     status: str
     created_at: datetime
+    # Campaign availability check
+    campaign_status: Optional[str] = None  # "active", "paused", "ended", "not_found"
+    is_campaign_active: bool = True  # False if campaign is paused/ended/not_found
 
     model_config = {"from_attributes": True}
 

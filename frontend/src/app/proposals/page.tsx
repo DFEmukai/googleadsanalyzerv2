@@ -377,9 +377,21 @@ export default function ProposalsPage() {
                       </p>
                     )}
                     {proposal.target_campaign && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        対象: {proposal.target_campaign}
-                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          対象: {proposal.target_campaign}
+                        </span>
+                        {!proposal.is_campaign_active && (
+                          <span className="flex items-center gap-1 rounded border border-signal-yellow/30 bg-signal-yellow/10 px-2 py-0.5 text-xs font-medium text-signal-yellow">
+                            <AlertTriangle className="h-3 w-3" />
+                            {proposal.campaign_status === "not_found"
+                              ? "キャンペーン削除済み"
+                              : proposal.campaign_status === "paused"
+                              ? "キャンペーン停止中"
+                              : "キャンペーン終了"}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -418,7 +430,13 @@ export default function ProposalsPage() {
                     {/* Action buttons for pending proposals */}
                     {proposal.status === "pending" && (
                       <div className="flex flex-wrap gap-2">
-                        {proposal.category !== "manual_creative" ? (
+                        {!proposal.is_campaign_active && proposal.target_campaign && (
+                          <span className="flex items-center gap-1.5 rounded-lg bg-muted/50 px-4 py-2 text-sm text-muted-foreground">
+                            <AlertTriangle className="h-4 w-4" />
+                            対象キャンペーンが無効のため承認できません
+                          </span>
+                        )}
+                        {proposal.is_campaign_active && proposal.category !== "manual_creative" && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -430,7 +448,8 @@ export default function ProposalsPage() {
                             <Check className="h-4 w-4" />
                             承認して反映
                           </button>
-                        ) : (
+                        )}
+                        {proposal.is_campaign_active && proposal.category === "manual_creative" && (
                           <span className="flex items-center gap-1.5 rounded-lg bg-signal-yellow/10 px-4 py-2 text-sm text-signal-yellow">
                             <AlertTriangle className="h-4 w-4" />
                             Chatworkタスク登録済み・手動対応が必要

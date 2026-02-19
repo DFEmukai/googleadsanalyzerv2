@@ -20,6 +20,7 @@ from app.models.proposal import (
     Priority,
     ProposalStatus,
 )
+from app.models.campaign import Campaign, CampaignStatus
 from app.schemas.proposal import (
     ProposalResponse,
     ProposalDetail,
@@ -94,23 +95,45 @@ async def list_proposals(
     result = await db.execute(query)
     proposals = result.scalars().all()
 
-    return [
-        ProposalResponse(
-            id=p.id,
-            report_id=p.report_id,
-            category=p.category.value,
-            priority=p.priority.value,
-            title=p.title,
-            description=p.description,
-            expected_effect=p.expected_effect,
-            action_steps=p.action_steps,
-            target_campaign=p.target_campaign,
-            target_ad_group=p.target_ad_group,
-            status=p.status.value,
-            created_at=p.created_at,
+    # Fetch all campaigns to check their status
+    campaign_result = await db.execute(select(Campaign))
+    campaigns = campaign_result.scalars().all()
+    campaign_status_map = {c.campaign_name: c.status.value for c in campaigns}
+
+    response_list = []
+    for p in proposals:
+        # Check if target campaign exists and is active
+        campaign_status = None
+        is_active = True
+
+        if p.target_campaign:
+            if p.target_campaign in campaign_status_map:
+                campaign_status = campaign_status_map[p.target_campaign]
+                is_active = campaign_status == "active"
+            else:
+                campaign_status = "not_found"
+                is_active = False
+
+        response_list.append(
+            ProposalResponse(
+                id=p.id,
+                report_id=p.report_id,
+                category=p.category.value,
+                priority=p.priority.value,
+                title=p.title,
+                description=p.description,
+                expected_effect=p.expected_effect,
+                action_steps=p.action_steps,
+                target_campaign=p.target_campaign,
+                target_ad_group=p.target_ad_group,
+                status=p.status.value,
+                created_at=p.created_at,
+                campaign_status=campaign_status,
+                is_campaign_active=is_active,
+            )
         )
-        for p in proposals
-    ]
+
+    return response_list
 
 
 @router.get("/{proposal_id}", response_model=ProposalDetail)
