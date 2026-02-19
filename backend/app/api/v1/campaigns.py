@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from app.db.session import get_db
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.weekly_report import WeeklyReport
-from app.models.proposal import Proposal
+from app.models.proposal import ImprovementProposal
 from app.schemas.campaign import (
     CampaignResponse,
     CampaignWithMetrics,
@@ -179,9 +179,9 @@ async def get_campaign_dashboard(
 
     # Get related proposals
     proposals_result = await db.execute(
-        select(Proposal)
-        .where(Proposal.target_campaign == campaign.campaign_name)
-        .order_by(desc(Proposal.created_at))
+        select(ImprovementProposal)
+        .where(ImprovementProposal.target_campaign == campaign.campaign_name)
+        .order_by(desc(ImprovementProposal.created_at))
         .limit(10)
     )
     proposals = proposals_result.scalars().all()
