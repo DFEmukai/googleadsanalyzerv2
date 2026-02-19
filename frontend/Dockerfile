@@ -23,6 +23,9 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
+# Disable telemetry and build traces to prevent hanging
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
 # ------ Stage 3: Runtime ------
