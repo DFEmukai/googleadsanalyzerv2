@@ -114,6 +114,10 @@ async def list_proposals(
                 campaign_status = "not_found"
                 is_active = False
 
+        # Skip proposals for inactive/non-existent campaigns
+        if not is_active:
+            continue
+
         response_list.append(
             ProposalResponse(
                 id=p.id,
