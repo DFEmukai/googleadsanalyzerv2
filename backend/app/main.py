@@ -37,14 +37,16 @@ app = FastAPI(
 
 settings = get_settings()
 
-# CORS: Allow configured frontend_url + common dev ports
-cors_origins = list(dict.fromkeys([
+# CORS: Allow configured frontend_url + Render domains + dev ports
+cors_origins = list(dict.fromkeys(filter(None, [
     settings.frontend_url,
+    "https://frontend-qja7.onrender.com",
+    "https://googleads-frontend.onrender.com",
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
     "http://localhost:3003",
-]))
+])))
 
 app.add_middleware(
     CORSMiddleware,
