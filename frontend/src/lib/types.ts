@@ -185,6 +185,43 @@ export interface ChatResponse {
   conversation_history: ChatMessage[];
 }
 
+// Impact Report types
+export interface KPISnapshot {
+  cost: number | null;
+  conversions: number | null;
+  cpa: number | null;
+  ctr: number | null;
+  roas: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  conversion_value: number | null;
+}
+
+export interface KPIChange {
+  cost: number | null;
+  conversions: number | null;
+  cpa: number | null;
+  ctr: number | null;
+  roas: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  conversion_value: number | null;
+}
+
+export interface ImpactPeriod {
+  before: string;
+  after?: string | null;
+}
+
+export interface ImpactReport {
+  status: "available" | "pending" | "no_data" | "no_before";
+  before?: KPISnapshot | null;
+  after?: KPISnapshot | null;
+  change?: KPIChange | null;
+  period?: ImpactPeriod | null;
+  message?: string | null;
+}
+
 // Labels
 export const CATEGORY_LABELS: Record<string, string> = {
   keyword: "キーワード",

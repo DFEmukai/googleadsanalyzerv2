@@ -26,9 +26,11 @@ from app.schemas.proposal import (
     ProposalStatusUpdate,
     ChatRequest,
     ChatResponse,
+    ImpactReport,
 )
 from app.services.proposal_executor import ProposalExecutor, SafeguardError
 from app.services.proposal_chat import ProposalChatService
+from app.services.impact_tracker import ImpactTracker
 
 router = APIRouter(prefix="/proposals", tags=["proposals"])
 
@@ -423,4 +425,40 @@ async def get_chat_history(
         raise HTTPException(
             status_code=500,
             detail=f"履歴取得エラー: {str(e)}",
+        )
+
+
+# ============================================================
+# Impact Report endpoints
+# ============================================================
+
+@router.get("/{proposal_id}/impact", response_model=ImpactReport)
+async def get_impact_report(
+    proposal_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the impact report for an executed proposal.
+
+    Compares before/after KPIs to measure the effect of the proposal.
+    Returns percentage changes for cost, conversions, CPA, CTR, ROAS, etc.
+    """
+    tracker = ImpactTracker(db)
+
+    try:
+        report = await tracker.get_impact_report(proposal_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="提案が見つかりません")
+
+        return ImpactReport(
+            status=report.get("status", "no_data"),
+            before=report.get("before"),
+            after=report.get("after"),
+            change=report.get("change"),
+            period=report.get("period"),
+            message=report.get("message"),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"インパクトレポート取得エラー: {str(e)}",
         )

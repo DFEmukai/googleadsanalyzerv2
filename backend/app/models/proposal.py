@@ -82,3 +82,8 @@ class ImprovementProposal(UUIDMixin, TimestampMixin, Base):
         order_by="ProposalConversation.created_at",
         cascade="all, delete-orphan",
     )
+    snapshots = relationship(
+        "ProposalSnapshot",
+        back_populates="proposal",
+        cascade="all, delete-orphan",
+    )

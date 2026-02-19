@@ -18,6 +18,7 @@ from app.models.auction_insight import AuctionInsight
 from app.services.data_fetcher import DataFetcher
 from app.services.claude_analyzer import ClaudeAnalyzer
 from app.services.chatwork import ChatworkService
+from app.services.impact_tracker import ImpactTracker
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class ReportGenerator:
         self.data_fetcher = DataFetcher(db)
         self.analyzer = ClaudeAnalyzer()
         self.chatwork = ChatworkService()
+        self.impact_tracker = ImpactTracker(db)
 
     async def generate_weekly_report(
         self,
@@ -93,7 +95,14 @@ class ReportGenerator:
 
         await self.db.commit()
 
-        # Step 7: Send Chatwork notification
+        # Step 7: Collect after data for executed proposals
+        impact_results = await self._collect_after_snapshots(
+            data["kpi_snapshot"],
+            data["start_date"],
+            data["end_date"],
+        )
+
+        # Step 8: Send Chatwork notification
         chatwork_result = None
         if send_chatwork and self.chatwork.is_configured():
             try:
@@ -127,6 +136,7 @@ class ReportGenerator:
             "proposals_generated": len(proposals_created),
             "status": "completed",
             "chatwork": chatwork_result,
+            "impact_tracking": impact_results,
         }
 
     async def _get_previous_kpi(self, current_week_start: date) -> dict[str, Any] | None:
@@ -164,3 +174,58 @@ class ReportGenerator:
             "low": Priority.LOW,
         }
         return mapping.get(priority, Priority.MEDIUM)
+
+    async def _collect_after_snapshots(
+        self,
+        kpi_snapshot: dict[str, Any],
+        period_start: date,
+        period_end: date,
+    ) -> dict[str, Any]:
+        """Collect after snapshots for proposals executed more than 7 days ago."""
+        proposals = await self.impact_tracker.get_proposals_needing_after_snapshot(
+            min_days_since_execution=7
+        )
+
+        if not proposals:
+            return {"collected": 0, "proposals": []}
+
+        # Build KPI data from current snapshot
+        kpi_data = {
+            "cost": kpi_snapshot.get("total_cost"),
+            "conversions": kpi_snapshot.get("total_conversions"),
+            "cpa": kpi_snapshot.get("cpa"),
+            "ctr": kpi_snapshot.get("ctr"),
+            "roas": kpi_snapshot.get("roas"),
+            "impressions": kpi_snapshot.get("impressions"),
+            "clicks": kpi_snapshot.get("clicks"),
+            "conversion_value": kpi_snapshot.get("conversion_value"),
+        }
+
+        collected = []
+        for proposal in proposals:
+            try:
+                # Extract campaign_id if possible
+                campaign_id = None
+                for step in (proposal.action_steps or []):
+                    if isinstance(step, dict) and step.get("campaign_id"):
+                        campaign_id = str(step["campaign_id"])
+                        break
+
+                await self.impact_tracker.save_after_snapshot(
+                    proposal_id=proposal.id,
+                    kpi_data=kpi_data,
+                    period_start=period_start,
+                    period_end=period_end,
+                    campaign_id=campaign_id,
+                )
+                collected.append({
+                    "proposal_id": str(proposal.id),
+                    "title": proposal.title,
+                })
+                logger.info(f"Collected after snapshot for proposal {proposal.id}")
+            except Exception as e:
+                logger.error(f"Failed to collect after snapshot for {proposal.id}: {e}")
+
+        await self.db.commit()
+
+        return {"collected": len(collected), "proposals": collected}

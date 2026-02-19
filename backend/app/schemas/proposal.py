@@ -69,3 +69,40 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     conversation_history: list[ChatMessage]
+
+
+# Impact Report schemas
+class KPISnapshot(BaseModel):
+    cost: Optional[float] = None
+    conversions: Optional[float] = None
+    cpa: Optional[float] = None
+    ctr: Optional[float] = None
+    roas: Optional[float] = None
+    impressions: Optional[int] = None
+    clicks: Optional[int] = None
+    conversion_value: Optional[float] = None
+
+
+class KPIChange(BaseModel):
+    cost: Optional[float] = None
+    conversions: Optional[float] = None
+    cpa: Optional[float] = None
+    ctr: Optional[float] = None
+    roas: Optional[float] = None
+    impressions: Optional[float] = None
+    clicks: Optional[float] = None
+    conversion_value: Optional[float] = None
+
+
+class ImpactPeriod(BaseModel):
+    before: str
+    after: Optional[str] = None
+
+
+class ImpactReport(BaseModel):
+    status: str  # "available", "pending", "no_data", "no_before"
+    before: Optional[KPISnapshot] = None
+    after: Optional[KPISnapshot] = None
+    change: Optional[KPIChange] = None
+    period: Optional[ImpactPeriod] = None
+    message: Optional[str] = None

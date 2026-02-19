@@ -13,6 +13,7 @@ from app.models.insight import LearningInsight, InsightType
 from app.models.competitor import Competitor, CompetitorSnapshot
 from app.models.auction_insight import AuctionInsight
 from app.models.conversation import ProposalConversation, MessageRole
+from app.models.snapshot import ProposalSnapshot, SnapshotType
 
 __all__ = [
     "Base",
@@ -33,4 +34,6 @@ __all__ = [
     "AuctionInsight",
     "ProposalConversation",
     "MessageRole",
+    "ProposalSnapshot",
+    "SnapshotType",
 ]

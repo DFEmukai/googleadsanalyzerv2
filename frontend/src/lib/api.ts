@@ -15,6 +15,7 @@ import type {
   ChatworkStatus,
   ChatMessage,
   ChatResponse,
+  ImpactReport,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -117,6 +118,8 @@ export const api = {
       fetchAPI<{ conversation_history: ChatMessage[] }>(
         `/proposals/${id}/chat/history`
       ),
+    getImpact: (id: string) =>
+      fetchAPI<ImpactReport>(`/proposals/${id}/impact`),
   },
   analysis: {
     run: () =>

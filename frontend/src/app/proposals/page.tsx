@@ -11,6 +11,7 @@ import {
 } from "@/lib/types";
 import AdCopyComparison from "@/components/proposals/AdCopyComparison";
 import { ProposalChat } from "@/components/proposals/ProposalChat";
+import { ImpactReport } from "@/components/proposals/ImpactReport";
 import {
   Check,
   X,
@@ -496,6 +497,11 @@ export default function ProposalsPage() {
                           反映後24時間以内のみ
                         </span>
                       </div>
+                    )}
+
+                    {/* Impact Report for executed proposals */}
+                    {proposal.status === "executed" && (
+                      <ImpactReport proposalId={proposal.id} />
                     )}
 
                     <div className="mt-3 text-xs text-muted-foreground">

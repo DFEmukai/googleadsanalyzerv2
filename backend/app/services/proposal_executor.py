@@ -5,16 +5,18 @@ improvement proposals, with safety limits and rollback capability.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.models.proposal import ImprovementProposal, ProposalStatus
 from app.models.execution import ProposalExecution
+from app.models.weekly_report import WeeklyReport
 from app.services.google_ads_writer import GoogleAdsWriter
 from app.services.chatwork import ChatworkService
 from app.services.ad_copy_validator import (
@@ -22,6 +24,7 @@ from app.services.ad_copy_validator import (
     validate_action_steps_structure,
     AdCopyValidationError,
 )
+from app.services.impact_tracker import ImpactTracker
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,7 @@ class ProposalExecutor:
         self.writer = GoogleAdsWriter()
         self.chatwork = ChatworkService()
         self.settings = get_settings()
+        self.impact_tracker = ImpactTracker(db)
 
     async def validate_safeguards(
         self,
@@ -108,11 +112,11 @@ class ProposalExecutor:
         Returns:
             Execution result with details
         """
-        # Get proposal
+        # Get proposal with report for KPI data
         result = await self.db.execute(
-            select(ImprovementProposal).where(
-                ImprovementProposal.id == proposal_id
-            )
+            select(ImprovementProposal)
+            .options(selectinload(ImprovementProposal.report))
+            .where(ImprovementProposal.id == proposal_id)
         )
         proposal = result.scalar_one_or_none()
 
@@ -126,6 +130,9 @@ class ProposalExecutor:
 
         # Validate safeguards
         warnings = await self.validate_safeguards(proposal, edited_values)
+
+        # Save before snapshot for impact tracking
+        await self._save_before_snapshot(proposal)
 
         # Execute based on category
         try:
@@ -597,3 +604,45 @@ class ProposalExecutor:
 
         # Try target_campaign (may contain the name, not ID)
         return None
+
+    async def _save_before_snapshot(
+        self,
+        proposal: ImprovementProposal,
+    ) -> None:
+        """Save a before snapshot using the latest weekly report KPIs."""
+        if not proposal.report:
+            logger.warning(
+                f"No report linked to proposal {proposal.id}, "
+                "cannot save before snapshot"
+            )
+            return
+
+        report = proposal.report
+        kpi_snapshot = report.kpi_snapshot or {}
+
+        # Build KPI data from report snapshot
+        kpi_data = {
+            "cost": kpi_snapshot.get("total_cost"),
+            "conversions": kpi_snapshot.get("total_conversions"),
+            "cpa": kpi_snapshot.get("cpa"),
+            "ctr": kpi_snapshot.get("ctr"),
+            "roas": kpi_snapshot.get("roas"),
+            "impressions": kpi_snapshot.get("impressions"),
+            "clicks": kpi_snapshot.get("clicks"),
+            "conversion_value": kpi_snapshot.get("conversion_value"),
+        }
+
+        # Extract campaign_id if available
+        campaign_id = self._extract_campaign_id(proposal)
+
+        try:
+            await self.impact_tracker.save_before_snapshot(
+                proposal_id=proposal.id,
+                kpi_data=kpi_data,
+                period_start=report.week_start_date,
+                period_end=report.week_end_date,
+                campaign_id=campaign_id,
+            )
+            logger.info(f"Saved before snapshot for proposal {proposal.id}")
+        except Exception as e:
+            logger.error(f"Failed to save before snapshot: {e}")
