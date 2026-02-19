@@ -13,6 +13,8 @@ import type {
   RollbackRequest,
   SafeguardCheckResponse,
   ChatworkStatus,
+  ChatMessage,
+  ChatResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -105,6 +107,15 @@ export const api = {
           method: "POST",
           body: JSON.stringify(editedValues || {}),
         }
+      ),
+    chat: (id: string, message: string) =>
+      fetchAPI<ChatResponse>(`/proposals/${id}/chat`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      }),
+    getChatHistory: (id: string) =>
+      fetchAPI<{ conversation_history: ChatMessage[] }>(
+        `/proposals/${id}/chat/history`
       ),
   },
   analysis: {

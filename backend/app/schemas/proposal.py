@@ -51,3 +51,21 @@ class ResultResponse(BaseModel):
 
 class ProposalStatusUpdate(BaseModel):
     status: str
+
+
+# Chat (Wall-bouncing) schemas
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    conversation_history: list[ChatMessage]

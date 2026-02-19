@@ -173,6 +173,18 @@ export interface ChatworkStatus {
   has_assignee: boolean;
 }
 
+// Chat (Wall-bouncing) types
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at?: string | null;
+}
+
+export interface ChatResponse {
+  reply: string;
+  conversation_history: ChatMessage[];
+}
+
 // Labels
 export const CATEGORY_LABELS: Record<string, string> = {
   keyword: "キーワード",

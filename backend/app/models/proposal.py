@@ -76,3 +76,9 @@ class ImprovementProposal(UUIDMixin, TimestampMixin, Base):
         "ProposalExecution", back_populates="proposal", uselist=False
     )
     result = relationship("ProposalResult", back_populates="proposal", uselist=False)
+    conversations = relationship(
+        "ProposalConversation",
+        back_populates="proposal",
+        order_by="ProposalConversation.created_at",
+        cascade="all, delete-orphan",
+    )

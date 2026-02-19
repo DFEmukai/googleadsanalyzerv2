@@ -10,6 +10,7 @@ import {
   STATUS_LABELS,
 } from "@/lib/types";
 import AdCopyComparison from "@/components/proposals/AdCopyComparison";
+import { ProposalChat } from "@/components/proposals/ProposalChat";
 import {
   Check,
   X,
@@ -404,6 +405,14 @@ export default function ProposalsPage() {
                     )}
 
                     {renderActionSteps(proposal)}
+
+                    {/* Chat with Claude (Wall-bouncing) */}
+                    {proposal.status === "pending" && (
+                      <ProposalChat
+                        proposalId={proposal.id}
+                        proposalTitle={proposal.title}
+                      />
+                    )}
 
                     {/* Action buttons for pending proposals */}
                     {proposal.status === "pending" && (

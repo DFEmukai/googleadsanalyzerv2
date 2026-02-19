@@ -24,8 +24,11 @@ from app.schemas.proposal import (
     ProposalResponse,
     ProposalDetail,
     ProposalStatusUpdate,
+    ChatRequest,
+    ChatResponse,
 )
 from app.services.proposal_executor import ProposalExecutor, SafeguardError
+from app.services.proposal_chat import ProposalChatService
 
 router = APIRouter(prefix="/proposals", tags=["proposals"])
 
@@ -369,4 +372,55 @@ async def check_safeguards(
         return SafeguardCheckResponse(
             can_execute=False,
             error=str(e),
+        )
+
+
+# ============================================================
+# Chat (Wall-bouncing) endpoints
+# ============================================================
+
+@router.post("/{proposal_id}/chat", response_model=ChatResponse)
+async def chat_about_proposal(
+    proposal_id: UUID,
+    body: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Chat with Claude about a proposal before approving it.
+
+    This allows users to discuss the proposal, ask questions,
+    explore alternatives, and understand risks before making a decision.
+    """
+    chat_service = ProposalChatService()
+
+    try:
+        reply, history = await chat_service.chat(
+            db=db,
+            proposal_id=proposal_id,
+            user_message=body.message,
+        )
+        return ChatResponse(reply=reply, conversation_history=history)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"チャットエラー: {str(e)}",
+        )
+
+
+@router.get("/{proposal_id}/chat/history")
+async def get_chat_history(
+    proposal_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the conversation history for a proposal."""
+    chat_service = ProposalChatService()
+
+    try:
+        history = await chat_service.get_conversation_history(db, proposal_id)
+        return {"conversation_history": history}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"履歴取得エラー: {str(e)}",
         )
