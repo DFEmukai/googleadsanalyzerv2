@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { Campaign } from "@/lib/types";
 import {
@@ -11,11 +12,12 @@ import {
   getSignalBgColor,
 } from "@/lib/utils";
 import { CAMPAIGN_TYPE_LABELS } from "@/lib/types";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, ChevronRight } from "lucide-react";
 
 type SortKey = "campaign_name" | "cost" | "conversions" | "cpa" | "ctr" | "roas";
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("cost");
@@ -34,6 +36,10 @@ export default function CampaignsPage() {
     }
     loadData();
   }, []);
+
+  const handleCampaignClick = (campaignId: string) => {
+    router.push(`/campaigns/${campaignId}`);
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -142,13 +148,15 @@ export default function CampaignsPage() {
                   asc={sortAsc}
                   onClick={handleSort}
                 />
+                <th className="w-10 px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((campaign) => (
                 <tr
                   key={campaign.id}
-                  className="border-b border-border transition-colors hover:bg-card-hover"
+                  className="cursor-pointer border-b border-border transition-colors hover:bg-card-hover"
+                  onClick={() => handleCampaignClick(campaign.id)}
                 >
                   <td className="px-4 py-3">
                     <span
@@ -181,6 +189,9 @@ export default function CampaignsPage() {
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {campaign.roas != null ? campaign.roas.toFixed(2) : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </td>
                 </tr>
               ))}

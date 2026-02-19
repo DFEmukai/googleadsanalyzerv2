@@ -2,6 +2,7 @@ import type {
   DashboardSummary,
   TrendData,
   Campaign,
+  CampaignDashboard,
   ReportSummary,
   ReportDetail,
   Proposal,
@@ -52,6 +53,9 @@ export const api = {
       const qs = searchParams.toString();
       return fetchAPI<Campaign[]>(`/campaigns${qs ? `?${qs}` : ""}`);
     },
+    get: (id: string) => fetchAPI<Campaign>(`/campaigns/${id}`),
+    getDashboard: (id: string, days = 7) =>
+      fetchAPI<CampaignDashboard>(`/campaigns/${id}/dashboard?days=${days}`),
   },
   reports: {
     list: (limit = 10) =>

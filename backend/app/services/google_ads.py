@@ -92,7 +92,7 @@ class GoogleAdsService:
                 campaign_budget.amount_micros
             FROM campaign
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
         """
         rows = self._query(query)
         results = []
@@ -107,6 +107,7 @@ class GoogleAdsService:
                 {
                     "campaign_id": str(row.campaign.id),
                     "campaign_name": row.campaign.name,
+                    "status": str(row.campaign.status).split(".")[-1].lower(),
                     "cost": cost,
                     "conversions": conversions,
                     "clicks": row.metrics.clicks,
@@ -141,7 +142,7 @@ class GoogleAdsService:
                 metrics.average_cpc
             FROM keyword_view
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
             ORDER BY metrics.cost_micros DESC
             LIMIT 200
         """
@@ -188,7 +189,7 @@ class GoogleAdsService:
                 metrics.conversions_value
             FROM ad_group
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
             ORDER BY metrics.cost_micros DESC
         """
         rows = self._query(query)
@@ -232,7 +233,7 @@ class GoogleAdsService:
                 metrics.impressions
             FROM search_term_view
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
             ORDER BY metrics.impressions DESC
             LIMIT 200
         """
@@ -271,7 +272,7 @@ class GoogleAdsService:
                 metrics.ctr
             FROM campaign
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
         """
         rows = self._query(query)
         results = []
@@ -307,7 +308,7 @@ class GoogleAdsService:
                 metrics.impressions
             FROM geographic_view
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
             ORDER BY metrics.cost_micros DESC
             LIMIT 100
         """
@@ -347,7 +348,7 @@ class GoogleAdsService:
                 metrics.auction_insight_search_outranking_share
             FROM auction_insight
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
         """
         try:
             rows = self._query(query)
@@ -384,7 +385,7 @@ class GoogleAdsService:
                 metrics.impressions
             FROM campaign
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
         """
         rows = self._query(query)
         results = []
@@ -427,7 +428,7 @@ class GoogleAdsService:
                 metrics.cost_micros
             FROM ad_group_ad
             WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
-                AND campaign.status != 'REMOVED'
+                AND campaign.status = 'ENABLED'
                 AND ad_group_ad.status != 'REMOVED'
                 AND ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
             ORDER BY metrics.impressions DESC
@@ -471,6 +472,54 @@ class GoogleAdsService:
                     "conversions": conversions,
                     "cost": cost,
                     "cpa": cost / conversions if conversions > 0 else 0,
+                }
+            )
+        return results
+
+    def get_campaign_daily_performance(
+        self, campaign_id: str, start_date: date, end_date: date
+    ) -> list[dict[str, Any]]:
+        """Fetch daily performance data for a specific campaign."""
+        query = f"""
+            SELECT
+                campaign.id,
+                campaign.name,
+                segments.date,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.clicks,
+                metrics.impressions,
+                metrics.ctr,
+                metrics.average_cpc,
+                metrics.conversions_value,
+                metrics.search_impression_share
+            FROM campaign
+            WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+                AND campaign.id = {campaign_id}
+            ORDER BY segments.date
+        """
+        rows = self._query(query)
+        results = []
+        for row in rows:
+            cost = row.metrics.cost_micros / 1_000_000
+            conversions = row.metrics.conversions
+            cpa = cost / conversions if conversions > 0 else 0
+            conv_value = row.metrics.conversions_value
+            roas = conv_value / cost if cost > 0 else 0
+
+            results.append(
+                {
+                    "date": str(row.segments.date),
+                    "cost": cost,
+                    "conversions": conversions,
+                    "clicks": row.metrics.clicks,
+                    "impressions": row.metrics.impressions,
+                    "ctr": row.metrics.ctr,
+                    "cpa": cpa,
+                    "roas": roas,
+                    "average_cpc": row.metrics.average_cpc / 1_000_000,
+                    "conversions_value": conv_value,
+                    "impression_share": row.metrics.search_impression_share or 0,
                 }
             )
         return results

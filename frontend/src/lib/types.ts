@@ -254,3 +254,56 @@ export const CAMPAIGN_TYPE_LABELS: Record<string, string> = {
   pmax: "P-MAX",
   video: "動画",
 };
+
+// Campaign Dashboard types
+export interface CampaignInfo {
+  id: string;
+  campaign_id: string;
+  name: string;
+  status: string;
+  type: string;
+}
+
+export interface CampaignSummary {
+  cost: number;
+  conversions: number;
+  cpa: number;
+  ctr: number;
+  roas: number;
+  clicks: number;
+  impressions: number;
+  impression_share: number | null;
+}
+
+export interface CampaignTrendPoint {
+  date: string;
+  cost: number;
+  conversions: number;
+  cpa: number;
+  ctr: number;
+  roas: number;
+  clicks: number;
+  impressions: number;
+}
+
+export interface CampaignPeriod {
+  start: string;
+  end: string;
+}
+
+export interface RelatedProposal {
+  id: string;
+  category: string;
+  priority: string;
+  title: string;
+  status: string;
+  expected_effect: string | null;
+}
+
+export interface CampaignDashboard {
+  campaign: CampaignInfo;
+  summary: CampaignSummary;
+  trends: CampaignTrendPoint[];
+  period: CampaignPeriod;
+  proposals: RelatedProposal[];
+}
