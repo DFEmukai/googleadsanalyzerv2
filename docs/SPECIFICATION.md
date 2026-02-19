@@ -231,8 +231,30 @@ pending（承認待ち）
   1. Google Ads APIから前週のパフォーマンスデータを取得
   2. Claude AIでデータを分析し改善提案を生成
   3. レポートと提案をデータベースに保存
-  4. Chatworkに通知を送信
+  4. 非アクティブキャンペーンの古い提案を自動スキップ
+  5. 実行済み提案の効果測定スナップショットを収集
+  6. Chatworkに通知を送信
 - **ミスファイア対応**: 1時間以内なら遅延実行
+
+### 3.9 キャンペーンフィルタリング
+
+- **分析対象**: `ENABLED`（有効）ステータスのキャンペーンのみ
+- **除外対象**: `PAUSED`（停止中）、`REMOVED`（削除済み）
+- **提案フィルタ**: 非アクティブキャンペーンの提案は一覧から自動除外
+- **クリーンアップ**: 週次分析時に古い提案を自動スキップ
+
+### 3.10 提案クリーンアップ
+
+#### 自動クリーンアップ
+- 週次分析実行時に自動実行
+- 対象: `pending`ステータスで、`target_campaign`が設定されており、
+  そのキャンペーンが非アクティブまたは存在しない提案
+- アクション: ステータスを`skipped`に変更
+
+#### 手動クリーンアップ
+- `POST /api/v1/proposals/cleanup` エンドポイントで実行
+- `dry_run=true`: クリーンアップ対象のプレビュー
+- `dry_run=false`: 実際にステータスを変更
 
 ---
 
@@ -276,6 +298,7 @@ pending（承認待ち）
 | POST | `/api/v1/proposals/{proposal_id}/chat` | 壁打ちチャット |
 | GET | `/api/v1/proposals/{proposal_id}/chat/history` | チャット履歴を取得 |
 | GET | `/api/v1/proposals/{proposal_id}/impact` | 効果レポートを取得 |
+| POST | `/api/v1/proposals/cleanup` | 非アクティブキャンペーンの提案をスキップ（dry_run対応） |
 
 ### 4.5 分析
 
@@ -399,6 +422,19 @@ pending（承認待ち）
 | period_end | DATE | NOT NULL | 期間終了日 |
 | created_at | TIMESTAMP | NOT NULL | レコード作成日時 |
 
+### 5.8 auction_insights（オークション分析）
+
+| カラム | 型 | 制約 | 説明 |
+|--------|-----|------|------|
+| id | UUID | PK | 主キー |
+| report_id | UUID | FK → weekly_reports.id | 親レポート |
+| competitor_domain | VARCHAR | NOT NULL | 競合ドメイン |
+| impression_share | NUMERIC(5,4) | NULLABLE | インプレッションシェア |
+| overlap_rate | NUMERIC(5,4) | NULLABLE | 重複率 |
+| position_above_rate | NUMERIC(5,4) | NULLABLE | 上位表示率 |
+| top_of_page_rate | NUMERIC(5,4) | NULLABLE | ページ上部表示率 |
+| outranking_share | NUMERIC(5,4) | NULLABLE | 優位表示シェア |
+
 ---
 
 ## 6. 環境変数一覧
@@ -492,4 +528,5 @@ pending（承認待ち）
 
 | 日付 | バージョン | 内容 |
 |------|-----------|------|
+| 2026-02-19 | 1.1.0 | キャンペーンフィルタリング、提案クリーンアップ機能追加 |
 | 2026-02-19 | 1.0.0 | 初版作成 |
