@@ -140,6 +140,64 @@ async def list_proposals(
     return response_list
 
 
+class CleanupResponse(BaseModel):
+    """Response from cleanup operation."""
+    skipped_count: int
+    skipped_proposals: list[dict[str, str]]
+
+
+@router.post("/cleanup", response_model=CleanupResponse)
+async def cleanup_inactive_proposals(
+    dry_run: bool = Query(default=True, description="If true, only report what would be cleaned up"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Clean up proposals for inactive/non-existent campaigns.
+
+    Sets status to 'skipped' for proposals where:
+    - target_campaign is set AND
+    - campaign doesn't exist OR campaign status is not 'active'
+
+    Use dry_run=true to preview what would be cleaned up.
+    """
+    # Get all pending proposals with target_campaign
+    query = select(ImprovementProposal).where(
+        ImprovementProposal.status == ProposalStatus.PENDING,
+        ImprovementProposal.target_campaign.isnot(None),
+    )
+    result = await db.execute(query)
+    proposals = result.scalars().all()
+
+    # Get all active campaigns
+    campaign_result = await db.execute(select(Campaign))
+    campaigns = campaign_result.scalars().all()
+    active_campaigns = {
+        c.campaign_name for c in campaigns if c.status == CampaignStatus.ACTIVE
+    }
+
+    # Find proposals to skip
+    to_skip = []
+    for p in proposals:
+        if p.target_campaign and p.target_campaign not in active_campaigns:
+            to_skip.append({
+                "id": str(p.id),
+                "title": p.title,
+                "target_campaign": p.target_campaign,
+            })
+
+    if not dry_run:
+        # Actually update the status
+        for p in proposals:
+            if p.target_campaign and p.target_campaign not in active_campaigns:
+                p.status = ProposalStatus.SKIPPED
+        await db.commit()
+
+    return CleanupResponse(
+        skipped_count=len(to_skip),
+        skipped_proposals=to_skip,
+    )
+
+
 @router.get("/{proposal_id}", response_model=ProposalDetail)
 async def get_proposal(proposal_id: UUID, db: AsyncSession = Depends(get_db)):
     """Get a single proposal with execution and result details."""

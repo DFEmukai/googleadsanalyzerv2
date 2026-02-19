@@ -124,6 +124,11 @@ export const api = {
       ),
     getImpact: (id: string) =>
       fetchAPI<ImpactReport>(`/proposals/${id}/impact`),
+    cleanup: (dryRun = true) =>
+      fetchAPI<{ skipped_count: number; skipped_proposals: Array<{ id: string; title: string; target_campaign: string }> }>(
+        `/proposals/cleanup?dry_run=${dryRun}`,
+        { method: "POST" }
+      ),
   },
   analysis: {
     run: () =>

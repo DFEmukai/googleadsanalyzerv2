@@ -13,8 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.models.weekly_report import WeeklyReport
-from app.models.proposal import ImprovementProposal, ProposalCategory, Priority
+from app.models.proposal import ImprovementProposal, ProposalCategory, Priority, ProposalStatus
 from app.models.auction_insight import AuctionInsight
+from app.models.campaign import Campaign, CampaignStatus
 from app.services.data_fetcher import DataFetcher
 from app.services.claude_analyzer import ClaudeAnalyzer
 from app.services.chatwork import ChatworkService
@@ -102,7 +103,11 @@ class ReportGenerator:
             data["end_date"],
         )
 
-        # Step 8: Send Chatwork notification
+        # Step 8: Clean up old proposals for inactive campaigns
+        cleanup_result = await self.cleanup_inactive_proposals()
+        logger.info(f"Cleanup: skipped {cleanup_result['skipped_count']} proposals for inactive campaigns")
+
+        # Step 9: Send Chatwork notification
         chatwork_result = None
         if send_chatwork and self.chatwork.is_configured():
             try:
@@ -137,6 +142,7 @@ class ReportGenerator:
             "status": "completed",
             "chatwork": chatwork_result,
             "impact_tracking": impact_results,
+            "cleanup": cleanup_result,
         }
 
     async def _get_previous_kpi(self, current_week_start: date) -> dict[str, Any] | None:
@@ -229,3 +235,43 @@ class ReportGenerator:
         await self.db.commit()
 
         return {"collected": len(collected), "proposals": collected}
+
+    async def cleanup_inactive_proposals(self) -> dict[str, Any]:
+        """Clean up pending proposals for inactive/non-existent campaigns.
+
+        Sets status to 'skipped' for proposals where:
+        - status is 'pending'
+        - target_campaign is set
+        - campaign doesn't exist OR campaign status is not 'active'
+        """
+        # Get all pending proposals with target_campaign
+        query = select(ImprovementProposal).where(
+            ImprovementProposal.status == ProposalStatus.PENDING,
+            ImprovementProposal.target_campaign.isnot(None),
+        )
+        result = await self.db.execute(query)
+        proposals = result.scalars().all()
+
+        # Get all active campaigns
+        campaign_result = await self.db.execute(select(Campaign))
+        campaigns = campaign_result.scalars().all()
+        active_campaigns = {
+            c.campaign_name for c in campaigns if c.status == CampaignStatus.ACTIVE
+        }
+
+        # Mark proposals as skipped
+        skipped = []
+        for p in proposals:
+            if p.target_campaign and p.target_campaign not in active_campaigns:
+                p.status = ProposalStatus.SKIPPED
+                skipped.append({
+                    "id": str(p.id),
+                    "title": p.title,
+                    "target_campaign": p.target_campaign,
+                })
+                logger.info(f"Skipped proposal {p.id} for inactive campaign: {p.target_campaign}")
+
+        if skipped:
+            await self.db.commit()
+
+        return {"skipped_count": len(skipped), "proposals": skipped}
