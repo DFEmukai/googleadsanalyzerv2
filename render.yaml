@@ -1,0 +1,52 @@
+# Render Blueprint - Google Ads AI Agent
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend (FastAPI)
+  - type: web
+    name: googleads-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_ID
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ADS_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_CUSTOMER_ID
+        sync: false
+      - key: GOOGLE_ADS_LOGIN_CUSTOMER_ID
+        sync: false
+      - key: CHATWORK_API_TOKEN
+        sync: false
+      - key: CHATWORK_ROOM_ID
+        sync: false
+      - key: CHATWORK_ASSIGNEE_ID
+        sync: false
+      - key: CHATWORK_MENTION_ID
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: DASHBOARD_URL
+        sync: false
+
+  # Frontend (Next.js)
+  - type: web
+    name: googleads-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
