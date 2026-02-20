@@ -66,6 +66,19 @@ class ReportGenerator:
         # Step 5: Save proposals
         proposals_created = []
         for proposal_data in analysis.get("proposals", []):
+            # Include target_campaign_id in action_steps if provided
+            action_steps = proposal_data.get("action_steps", [])
+            target_campaign_id = proposal_data.get("target_campaign_id")
+            if target_campaign_id:
+                if isinstance(action_steps, dict):
+                    action_steps["target_campaign_id"] = target_campaign_id
+                elif isinstance(action_steps, list):
+                    # Wrap list in dict to include campaign_id
+                    action_steps = {
+                        "steps": action_steps,
+                        "target_campaign_id": target_campaign_id,
+                    }
+
             proposal = ImprovementProposal(
                 report_id=report.id,
                 category=self._map_category(proposal_data.get("category", "keyword")),
@@ -73,7 +86,7 @@ class ReportGenerator:
                 title=proposal_data.get("title", ""),
                 description=proposal_data.get("description", ""),
                 expected_effect=proposal_data.get("expected_effect", ""),
-                action_steps=proposal_data.get("action_steps", []),
+                action_steps=action_steps,
                 target_campaign=proposal_data.get("target_campaign"),
                 target_ad_group=proposal_data.get("target_ad_group"),
             )

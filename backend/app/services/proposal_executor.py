@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.models.proposal import ImprovementProposal, ProposalStatus
 from app.models.execution import ProposalExecution
 from app.models.weekly_report import WeeklyReport
+from app.models.campaign import Campaign
 from app.services.google_ads_writer import GoogleAdsWriter
 from app.services.chatwork import ChatworkService
 from app.services.ad_copy_validator import (
@@ -279,19 +280,19 @@ class ProposalExecutor:
         operations = []
 
         if category == "budget":
-            ops = self._execute_budget_change(proposal, edited_values)
+            ops = await self._execute_budget_change(proposal, edited_values)
             operations.extend(ops)
         elif category == "bidding":
-            ops = self._execute_bidding_change(proposal, edited_values)
+            ops = await self._execute_bidding_change(proposal, edited_values)
             operations.extend(ops)
         elif category == "keyword":
-            ops = self._execute_keyword_change(proposal, edited_values)
+            ops = await self._execute_keyword_change(proposal, edited_values)
             operations.extend(ops)
         elif category in ("ad_copy", "creative"):
             ops = self._execute_ad_copy_change(proposal, edited_values)
             operations.extend(ops)
         elif category == "targeting":
-            ops = self._execute_targeting_change(proposal, edited_values)
+            ops = await self._execute_targeting_change(proposal, edited_values)
             operations.extend(ops)
         elif category == "manual_creative":
             raise ValueError(
@@ -309,14 +310,14 @@ class ProposalExecutor:
             "executed_at": datetime.now().isoformat(),
         }
 
-    def _execute_budget_change(
+    async def _execute_budget_change(
         self,
         proposal: ImprovementProposal,
         edited_values: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
         """Execute budget-related changes."""
         results = []
-        campaign_id = self._extract_campaign_id(proposal)
+        campaign_id = await self._extract_campaign_id(proposal)
         if not campaign_id:
             raise ValueError("対象キャンペーンIDが特定できません")
 
@@ -340,14 +341,14 @@ class ProposalExecutor:
 
         return results
 
-    def _execute_bidding_change(
+    async def _execute_bidding_change(
         self,
         proposal: ImprovementProposal,
         edited_values: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
         """Execute bidding strategy changes."""
         results = []
-        campaign_id = self._extract_campaign_id(proposal)
+        campaign_id = await self._extract_campaign_id(proposal)
         if not campaign_id:
             raise ValueError("対象キャンペーンIDが特定できません")
 
@@ -370,14 +371,14 @@ class ProposalExecutor:
 
         return results
 
-    def _execute_keyword_change(
+    async def _execute_keyword_change(
         self,
         proposal: ImprovementProposal,
         edited_values: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
         """Execute keyword changes (add/remove/negative)."""
         results = []
-        campaign_id = self._extract_campaign_id(proposal)
+        campaign_id = await self._extract_campaign_id(proposal)
 
         if edited_values:
             # Negative keywords
@@ -486,14 +487,14 @@ class ProposalExecutor:
 
         return results
 
-    def _execute_targeting_change(
+    async def _execute_targeting_change(
         self,
         proposal: ImprovementProposal,
         edited_values: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
         """Execute targeting changes (device bid modifiers, etc.)."""
         results = []
-        campaign_id = self._extract_campaign_id(proposal)
+        campaign_id = await self._extract_campaign_id(proposal)
         if not campaign_id:
             raise ValueError("対象キャンペーンIDが特定できません")
 
@@ -592,17 +593,69 @@ class ProposalExecutor:
             "status": "completed",
         }
 
-    @staticmethod
-    def _extract_campaign_id(
+    async def _extract_campaign_id(
+        self,
         proposal: ImprovementProposal,
     ) -> str | None:
-        """Extract campaign ID from proposal data."""
-        # Try action_steps first
-        for step in (proposal.action_steps or []):
-            if isinstance(step, dict) and step.get("campaign_id"):
-                return str(step["campaign_id"])
+        """Extract campaign ID from proposal data.
 
-        # Try target_campaign (may contain the name, not ID)
+        Tries multiple sources:
+        1. action_steps (if it contains campaign_id)
+        2. target_campaign_id field (if present)
+        3. Search Campaign table by target_campaign name
+        4. Search in report's raw_data by campaign name
+        """
+        # 1. Try action_steps first (structured data may contain ID)
+        action_steps = proposal.action_steps
+        if isinstance(action_steps, list):
+            for step in action_steps:
+                if isinstance(step, dict) and step.get("campaign_id"):
+                    return str(step["campaign_id"])
+        elif isinstance(action_steps, dict):
+            # For structured action_steps (like ad_copy_change)
+            if action_steps.get("campaign_id"):
+                return str(action_steps["campaign_id"])
+            # Check wrapped steps format: {"steps": [...], "target_campaign_id": "xxx"}
+            if action_steps.get("steps"):
+                for step in action_steps["steps"]:
+                    if isinstance(step, dict) and step.get("campaign_id"):
+                        return str(step["campaign_id"])
+
+        # 2. Try target_campaign_id if stored in action_steps root
+        if isinstance(action_steps, dict) and action_steps.get("target_campaign_id"):
+            return str(action_steps["target_campaign_id"])
+
+        # 3. Search Campaign table by target_campaign name
+        campaign_name = proposal.target_campaign
+        if campaign_name:
+            result = await self.db.execute(
+                select(Campaign).where(Campaign.campaign_name == campaign_name)
+            )
+            campaign = result.scalar_one_or_none()
+            if campaign:
+                logger.info(
+                    f"Found campaign ID {campaign.campaign_id} for name '{campaign_name}'"
+                )
+                return campaign.campaign_id
+
+        # 4. Search in report's raw_data by campaign name
+        if proposal.report and proposal.report.raw_data:
+            raw_data = proposal.report.raw_data
+            campaign_performance = raw_data.get("campaign_performance", [])
+            for cp in campaign_performance:
+                if cp.get("campaign_name") == campaign_name:
+                    campaign_id = cp.get("campaign_id")
+                    if campaign_id:
+                        logger.info(
+                            f"Found campaign ID {campaign_id} in report raw_data "
+                            f"for name '{campaign_name}'"
+                        )
+                        return str(campaign_id)
+
+        logger.warning(
+            f"Could not find campaign ID for proposal {proposal.id} "
+            f"(target_campaign: {campaign_name})"
+        )
         return None
 
     async def _save_before_snapshot(
@@ -633,7 +686,7 @@ class ProposalExecutor:
         }
 
         # Extract campaign_id if available
-        campaign_id = self._extract_campaign_id(proposal)
+        campaign_id = await self._extract_campaign_id(proposal)
 
         try:
             await self.impact_tracker.save_before_snapshot(

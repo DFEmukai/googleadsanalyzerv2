@@ -57,15 +57,21 @@ SYSTEM_PROMPT = """あなたはGoogle広告の運用に精通したエキスパ�
       "description": "詳細な説明",
       "expected_effect": "期待効果（例：CPA -10%）",
       "action_steps": [
-        {"step": 1, "description": "具体的な手順1"},
+        {"step": 1, "description": "具体的な手順1", "campaign_id": "キャンペーンID"},
         {"step": 2, "description": "具体的な手順2"}
       ],
       "target_campaign": "対象キャンペーン名",
+      "target_campaign_id": "対象キャンペーンID（データから取得）",
       "target_ad_group": "対象広告グループ名（あれば）"
     }
   ]
 }
 ```
+
+### 重要: キャンペーンIDの取得
+- target_campaign_idは必須です。キャンペーン別パフォーマンスデータの campaign_id から取得してください
+- 提案対象のキャンペーン名と一致するキャンペーンのIDを使用してください
+- IDが見つからない場合は、空文字ではなく省略してください
 
 ## creativeカテゴリの特別フォーマット
 広告文パフォーマンスデータがある場合、必ず1件以上のcreative提案を含めてください。
