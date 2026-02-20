@@ -126,10 +126,10 @@ frontend/src/
 ### 3.1 ダッシュボード
 
 #### 全体サマリー
-- **表示項目**: 費用、CV数、CPA、CTR、ROAS、インプレッションシェア
+- **表示項目**: 費用、CV数、CPA、CTR、ROAS、インプレッション（直近7日間）
 - **シグナル表示**: 各KPIを緑（良好）/黄（注意）/赤（要対応）/青（情報）で色分け
-- **前週比較**: 変動率と矢印アイコンで前週との比較を表示
-- **トレンドチャート**: 最大52週分のKPI推移をグラフ表示
+- **前週比較**: 直近7日間と、その前の7日間（8日前〜14日前）を比較
+- **トレンドチャート**: 直近7日間の日別KPI推移をグラフ表示（X軸に各日付を表示）
 
 #### キャンペーン別ダッシュボード
 - **キャンペーン情報**: 名前、ステータス、タイプ
@@ -264,8 +264,8 @@ pending（承認待ち）
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| GET | `/api/v1/dashboard/summary` | 今週のKPIサマリーを取得 |
-| GET | `/api/v1/dashboard/trends` | KPIトレンドデータを取得（weeks=1-52） |
+| GET | `/api/v1/dashboard/summary` | 直近7日間のKPIサマリーを取得（Google Ads APIからリアルタイム取得） |
+| GET | `/api/v1/dashboard/trends` | 日別KPIトレンドデータを取得（days=1-30、デフォルト7日） |
 
 ### 4.2 キャンペーン
 
@@ -503,8 +503,9 @@ pending（承認待ち）
 
 | 環境 | サービス | URL |
 |------|---------|-----|
-| 本番 | フロントエンド | https://googleads-frontend.onrender.com |
-| 本番 | バックエンド | https://googleads-backend.onrender.com |
+| 本番 | バックエンド（Render） | https://googleads-backend-7v2o.onrender.com |
+| 本番 | バックエンド（カスタムドメイン） | https://sbpads-api.dfe.jp |
+| 本番 | フロントエンド | https://googleads-frontend-xxxx.onrender.com |
 
 ### 7.3 GCPデプロイ構成（代替）
 
