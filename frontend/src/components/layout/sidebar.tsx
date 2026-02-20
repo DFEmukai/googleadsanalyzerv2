@@ -8,6 +8,7 @@ import {
   Megaphone,
   FileText,
   Lightbulb,
+  HelpCircle,
 } from "lucide-react";
 
 const navItems = [
@@ -30,6 +31,11 @@ const navItems = [
     label: "改善提案",
     href: "/proposals",
     icon: Lightbulb,
+  },
+  {
+    label: "ヘルプ",
+    href: "/help",
+    icon: HelpCircle,
   },
 ];
 
