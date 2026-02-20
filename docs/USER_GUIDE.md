@@ -33,10 +33,7 @@ Google Ads AI Agentは、Google広告アカウントの運用を支援するAI�
 ### 1.2 アクセス方法
 
 ブラウザで以下のURLにアクセスします：
-
-```
-https://[フロントエンドURL]/
-```
+https://frontend-qja7.onrender.com/dashboard
 
 ログイン認証は現在実装されていません（社内利用想定）。
 
