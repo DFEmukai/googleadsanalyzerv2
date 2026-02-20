@@ -204,30 +204,66 @@ async def get_dashboard_summary(db: AsyncSession = Depends(get_db)):
 
 @router.get("/trends", response_model=TrendData)
 async def get_dashboard_trends(
-    weeks: int = Query(default=8, ge=1, le=52),
+    days: int = Query(default=7, ge=1, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get KPI trends for the specified number of weeks."""
-    result = await db.execute(
-        select(WeeklyReport)
-        .order_by(desc(WeeklyReport.week_start_date))
-        .limit(weeks)
-    )
-    reports = result.scalars().all()
+    """Get daily KPI trends for the specified number of days.
 
-    trends = []
-    for report in reversed(reports):
-        kpi = report.kpi_snapshot or {}
-        trends.append(
-            TrendPoint(
-                week_start=report.week_start_date,
-                total_cost=kpi.get("total_cost"),
-                total_conversions=kpi.get("total_conversions"),
-                cpa=kpi.get("cpa"),
-                ctr=kpi.get("ctr"),
-                roas=kpi.get("roas"),
-                impression_share=kpi.get("impression_share"),
-            )
+    Fetches real-time daily data from Google Ads API.
+    Default is 7 days of data for the trend graph.
+    """
+    today = date.today()
+    # Exclude today as data may be incomplete
+    end_date = today - timedelta(days=1)
+    start_date = end_date - timedelta(days=days - 1)
+
+    google_ads_service = GoogleAdsService()
+
+    try:
+        daily_data = google_ads_service.get_daily_account_performance(
+            start_date=start_date, end_date=end_date
         )
 
-    return TrendData(trends=trends)
+        trends = []
+        for day in daily_data:
+            # Parse date string to date object
+            day_date = date.fromisoformat(day["date"])
+            trends.append(
+                TrendPoint(
+                    week_start=day_date,  # Using week_start field for daily date
+                    total_cost=day.get("cost"),
+                    total_conversions=day.get("conversions"),
+                    cpa=day.get("cpa"),
+                    ctr=day.get("ctr"),
+                    roas=day.get("roas"),
+                    impression_share=day.get("impression_share"),
+                )
+            )
+
+        return TrendData(trends=trends)
+
+    except Exception:
+        # Fallback to WeeklyReport if Google Ads API fails
+        result = await db.execute(
+            select(WeeklyReport)
+            .order_by(desc(WeeklyReport.week_start_date))
+            .limit(days)
+        )
+        reports = result.scalars().all()
+
+        trends = []
+        for report in reversed(reports):
+            kpi = report.kpi_snapshot or {}
+            trends.append(
+                TrendPoint(
+                    week_start=report.week_start_date,
+                    total_cost=kpi.get("total_cost"),
+                    total_conversions=kpi.get("total_conversions"),
+                    cpa=kpi.get("cpa"),
+                    ctr=kpi.get("ctr"),
+                    roas=kpi.get("roas"),
+                    impression_share=kpi.get("impression_share"),
+                )
+            )
+
+        return TrendData(trends=trends)

@@ -476,6 +476,93 @@ class GoogleAdsService:
             )
         return results
 
+    def get_daily_account_performance(
+        self, start_date: date, end_date: date
+    ) -> list[dict[str, Any]]:
+        """Fetch daily aggregated performance data for all campaigns.
+
+        Returns daily totals for the entire account, sorted by date.
+        """
+        query = f"""
+            SELECT
+                segments.date,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.clicks,
+                metrics.impressions,
+                metrics.conversions_value,
+                metrics.search_impression_share
+            FROM campaign
+            WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+                AND campaign.status = 'ENABLED'
+            ORDER BY segments.date
+        """
+        rows = self._query(query)
+
+        # Aggregate by date
+        daily_data: dict[str, dict] = {}
+        for row in rows:
+            date_str = str(row.segments.date)
+            if date_str not in daily_data:
+                daily_data[date_str] = {
+                    "date": date_str,
+                    "cost": 0.0,
+                    "conversions": 0.0,
+                    "clicks": 0,
+                    "impressions": 0,
+                    "conversions_value": 0.0,
+                    "impression_share_sum": 0.0,
+                    "impression_share_count": 0,
+                }
+
+            daily = daily_data[date_str]
+            daily["cost"] += row.metrics.cost_micros / 1_000_000
+            daily["conversions"] += row.metrics.conversions
+            daily["clicks"] += row.metrics.clicks
+            daily["impressions"] += row.metrics.impressions
+            daily["conversions_value"] += row.metrics.conversions_value
+
+            imp_share = row.metrics.search_impression_share
+            if imp_share and imp_share > 0:
+                daily["impression_share_sum"] += imp_share
+                daily["impression_share_count"] += 1
+
+        # Calculate derived metrics
+        results = []
+        for date_str in sorted(daily_data.keys()):
+            daily = daily_data[date_str]
+            cost = daily["cost"]
+            conversions = daily["conversions"]
+            clicks = daily["clicks"]
+            impressions = daily["impressions"]
+            conv_value = daily["conversions_value"]
+
+            cpa = cost / conversions if conversions > 0 else 0
+            ctr = (clicks / impressions * 100) if impressions > 0 else 0
+            roas = conv_value / cost if cost > 0 else 0
+            avg_imp_share = (
+                daily["impression_share_sum"] / daily["impression_share_count"]
+                if daily["impression_share_count"] > 0
+                else 0
+            )
+
+            results.append(
+                {
+                    "date": date_str,
+                    "cost": cost,
+                    "conversions": conversions,
+                    "clicks": clicks,
+                    "impressions": impressions,
+                    "ctr": ctr,
+                    "cpa": cpa,
+                    "roas": roas,
+                    "conversions_value": conv_value,
+                    "impression_share": avg_imp_share,
+                }
+            )
+
+        return results
+
     def get_campaign_daily_performance(
         self, campaign_id: str, start_date: date, end_date: date
     ) -> list[dict[str, Any]]:
